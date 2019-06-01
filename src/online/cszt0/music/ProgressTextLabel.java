@@ -28,7 +28,7 @@ public class ProgressTextLabel extends JComponent {
 		FontMetrics fontMetrics = getFontMetrics(getFont());
 		int width = fontMetrics.stringWidth(text);
 		int height = fontMetrics.getHeight();
-		setPreferredSize(new Dimension(width, height));
+		setPreferredSize(new Dimension(Math.min(1920, width), height));
 	}
 
 	public void setProgress(float progress) {
@@ -50,9 +50,24 @@ public class ProgressTextLabel extends JComponent {
 		if (text == null) {
 			return;
 		}
+		FontMetrics fontMetrics = getFontMetrics(getFont());
+		int width = fontMetrics.stringWidth(text);
+		int x;
+		if (width < 1920) {
+			x = 0;
+		} else {
+			x = (int) (1920 / 2 - progress);
+			if (x > 0) {
+				x = 0;
+			}
+			int min = 1920 - width;
+			if (x < min) {
+				x = min;
+			}
+		}
 		((Graphics2D) g).setPaint(gradientPaint);
-		gradientPaint.setLeft(getX());
+		gradientPaint.setLeft(getX() + x);
 		gradientPaint.setProgress(progress);
-		g.drawString(text, 0, getFontMetrics(getFont()).getAscent());
+		g.drawString(text, x, getFontMetrics(getFont()).getAscent());
 	}
 }
