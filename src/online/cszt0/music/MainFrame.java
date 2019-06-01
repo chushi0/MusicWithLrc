@@ -11,10 +11,8 @@ import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Stack;
 import java.util.regex.Matcher;
@@ -206,6 +204,12 @@ public class MainFrame extends JFrame implements Runnable {
 				lrcs.add(e);
 			}
 		}
+		Lrc e = new Lrc();
+		Lrc lrc = lrcs.get(lrcs.size() - 1);
+		e.time = lrc.time + 5000;
+		e.text = lrc.text;
+		e.translate = lrc.translate;
+		lrcs.add(e);
 		lrcFrame.lrcs = lrcs;
 		lrcFrame.startTime = System.currentTimeMillis();
 	}
@@ -262,7 +266,7 @@ public class MainFrame extends JFrame implements Runnable {
 	private void nextMusic() {
 		updateAudioList();
 		if (list != null) {
-			if(repeat.isSelected()) {
+			if (repeat.isSelected()) {
 				playMusic(lastMusic.peek());
 				return;
 			}
@@ -274,8 +278,8 @@ public class MainFrame extends JFrame implements Runnable {
 	class LrcFrame extends JWindow implements Runnable {
 		ArrayList<Lrc> lrcs;
 		String name;
-		JLabel text;
-		JLabel translate;
+		ProgressTextLabel text;
+		ProgressTextLabel translate;
 		long startTime;
 
 		LrcFrame() {
@@ -284,11 +288,11 @@ public class MainFrame extends JFrame implements Runnable {
 			gridBagConstraints.anchor = GridBagConstraints.CENTER;
 			gridBagConstraints.gridy = 0;
 			gridBagConstraints.gridx = 0;
-			text = new JLabel();
+			text = new ProgressTextLabel();
 			text.setFont(new Font(Font.DIALOG, Font.PLAIN, 32));
 			text.setForeground(Color.BLUE);
 			panel.add(text, gridBagConstraints);
-			translate = new JLabel();
+			translate = new ProgressTextLabel();
 			translate.setFont(new Font(Font.DIALOG, Font.PLAIN, 24));
 			translate.setForeground(Color.BLUE);
 			gridBagConstraints.gridy = 1;
@@ -305,27 +309,29 @@ public class MainFrame extends JFrame implements Runnable {
 				// 更新文本框文字
 				if (lrcs == null) {
 					text.setText("Lrc - View");
+					text.setProgress(-1);
 					translate.setText(null);
 				} else {
 					long curTime = System.currentTimeMillis() - startTime;
+					long lastTime = 0;
+					float progress = -1;
 					String t = name;
 					String tran = null;
 					for (Lrc lrc : lrcs) {
-						if (curTime > lrc.time) {
+						long time = lrc.time;
+						if (curTime > time) {
+							lastTime = time;
 							t = lrc.text;
 							tran = lrc.translate;
 						} else {
+							progress = (float) (curTime - lastTime) / (time - lastTime + 1);
 							break;
 						}
 					}
 					text.setText(t);
+					text.setProgress(progress);
 					translate.setText(tran);
-				}
-				try {
-					sleep(10);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-					return;
+					translate.setProgress(progress);
 				}
 			}
 		}
