@@ -41,6 +41,8 @@ public class MainFrame extends JFrame implements Runnable {
 	JButton nextButton;
 	JButton playButton;
 
+	JCheckBoxMenuItem repeat;
+
 	AudioPlayer audioPlayer;
 	AudioStream audioStream;
 
@@ -67,6 +69,10 @@ public class MainFrame extends JFrame implements Runnable {
 		controlPanel.add(realControlPanel, BorderLayout.SOUTH);
 		controlPanel.add(progressBar, BorderLayout.CENTER);
 		setContentPane(contentPanel);
+		repeat = new JCheckBoxMenuItem("洗脑循环");
+		JMenuBar jMenuBar = new JMenuBar();
+		jMenuBar.add(repeat);
+		setJMenuBar(jMenuBar);
 		updateAudioList();
 		audioPlayer = AudioPlayer.player;
 		lastMusic = new Stack<>();
@@ -256,6 +262,10 @@ public class MainFrame extends JFrame implements Runnable {
 	private void nextMusic() {
 		updateAudioList();
 		if (list != null) {
+			if(repeat.isSelected()) {
+				playMusic(lastMusic.peek());
+				return;
+			}
 			int len = list.length;
 			playMusic(list[(int) (System.currentTimeMillis() % len)]);
 		}
