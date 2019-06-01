@@ -290,11 +290,9 @@ public class MainFrame extends JFrame implements Runnable {
 			gridBagConstraints.gridx = 0;
 			text = new ProgressTextLabel();
 			text.setFont(new Font(Font.DIALOG, Font.PLAIN, 32));
-			text.setForeground(Color.BLUE);
 			panel.add(text, gridBagConstraints);
 			translate = new ProgressTextLabel();
 			translate.setFont(new Font(Font.DIALOG, Font.PLAIN, 24));
-			translate.setForeground(Color.BLUE);
 			gridBagConstraints.gridy = 1;
 			panel.add(translate, gridBagConstraints);
 			setContentPane(panel);
