@@ -44,7 +44,7 @@ public class MainFrame extends JFrame implements Runnable {
 	AudioPlayer audioPlayer;
 	AudioStream audioStream;
 
-	Stack<String> lastMusic;
+	LimitStack<String> lastMusic;
 	String[] list;
 
 	private MainFrame() {
@@ -73,7 +73,7 @@ public class MainFrame extends JFrame implements Runnable {
 		setJMenuBar(jMenuBar);
 		updateAudioList();
 		audioPlayer = AudioPlayer.player;
-		lastMusic = new Stack<>();
+		lastMusic = new LimitStack<>();
 		musicList.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
