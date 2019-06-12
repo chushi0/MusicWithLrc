@@ -5,16 +5,24 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import sun.audio.AudioPlayer;
 import sun.audio.AudioStream;
+import sun.swing.ImageIconUIResource;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Stack;
 import java.util.regex.Matcher;
@@ -44,6 +52,7 @@ public class MainFrame extends JFrame implements Runnable {
 	JCheckBoxMenuItem repeat;
 
 	MediaPlayer mediaPlayer;
+	TrayIcon trayIcon;
 
 	LimitStack<String> lastMusic;
 	String[] list;
@@ -140,9 +149,46 @@ public class MainFrame extends JFrame implements Runnable {
 
 	static void showFrame() {
 		MainFrame mainFrame = new MainFrame();
+		mainFrame.setIconImage(new ImageIcon("icon.png").getImage());
 		mainFrame.setSize(new Dimension(400, 300));
 		mainFrame.setLocationRelativeTo(null);
-		mainFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+		if (SystemTray.isSupported()) {
+			mainFrame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+			Image icon = new ImageIcon("icon.png").getImage();
+			mainFrame.trayIcon = new TrayIcon(icon, "已停止");
+			mainFrame.trayIcon.setImageAutoSize(true);
+			PopupMenu popupMenu = new PopupMenu();
+			MenuItem reshow = new MenuItem("打开主界面");
+			reshow.addActionListener(e -> {
+				mainFrame.setVisible(true);
+				SystemTray.getSystemTray().remove(mainFrame.trayIcon);
+			});
+			MenuItem exit = new MenuItem("退出");
+			exit.addActionListener(e -> System.exit(0));
+			popupMenu.add(reshow);
+			popupMenu.addSeparator();
+			popupMenu.add(exit);
+			mainFrame.trayIcon.setPopupMenu(popupMenu);
+			mainFrame.trayIcon.addActionListener(e -> {
+				mainFrame.setVisible(true);
+				SystemTray.getSystemTray().remove(mainFrame.trayIcon);
+			});
+			mainFrame.addWindowListener(new WindowAdapter() {
+				@Override
+				public void windowClosing(WindowEvent e) {
+					super.windowClosing(e);
+					mainFrame.setVisible(false);
+					try {
+						SystemTray.getSystemTray().add(mainFrame.trayIcon);
+					} catch (AWTException e1) {
+						e1.printStackTrace();
+						System.exit(0);
+					}
+				}
+			});
+		} else {
+			mainFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+		}
 		mainFrame.setVisible(true);
 		mainFrame.lrcFrame = mainFrame.new LrcFrame();
 		mainFrame.lrcFrame.setAlwaysOnTop(true);
@@ -166,6 +212,9 @@ public class MainFrame extends JFrame implements Runnable {
 			});
 			mediaPlayer.play();
 			playButton.setText("■");
+			if (trayIcon != null) {
+				trayIcon.setToolTip("正在播放：" + musicName);
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -176,7 +225,7 @@ public class MainFrame extends JFrame implements Runnable {
 		lrcFrame.lrcs = null;
 		lrcFrame.name = musicName.substring(0, musicName.lastIndexOf('.'));
 		ArrayList<Lrc> lrcs = new ArrayList<>();
-		try (BufferedReader reader = new BufferedReader(new FileReader(new File(lrcDir, musicName)))) {
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(new File(lrcDir, musicName)), StandardCharsets.UTF_8))) {
 			String line;
 			while ((line = reader.readLine()) != null) {
 				line = line.trim();
@@ -223,6 +272,9 @@ public class MainFrame extends JFrame implements Runnable {
 			mediaPlayer.stop();
 			mediaPlayer.dispose();
 			mediaPlayer = null;
+		}
+		if (trayIcon != null) {
+			trayIcon.setToolTip("已停止");
 		}
 		lrcFrame.lrcs = null;
 		playButton.setText("▶");
