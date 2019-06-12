@@ -1,6 +1,8 @@
 package online.cszt0.music;
 
 import com.sun.awt.AWTUtilities;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
 import sun.audio.AudioPlayer;
 import sun.audio.AudioStream;
 
@@ -41,8 +43,7 @@ public class MainFrame extends JFrame implements Runnable {
 
 	JCheckBoxMenuItem repeat;
 
-	AudioPlayer audioPlayer;
-	AudioStream audioStream;
+	MediaPlayer mediaPlayer;
 
 	LimitStack<String> lastMusic;
 	String[] list;
@@ -72,7 +73,6 @@ public class MainFrame extends JFrame implements Runnable {
 		jMenuBar.add(repeat);
 		setJMenuBar(jMenuBar);
 		updateAudioList();
-		audioPlayer = AudioPlayer.player;
 		lastMusic = new LimitStack<>();
 		musicList.addMouseListener(new MouseAdapter() {
 			@Override
@@ -84,7 +84,7 @@ public class MainFrame extends JFrame implements Runnable {
 			}
 		});
 		playButton.addActionListener(event -> {
-			if (audioStream == null) {
+			if (mediaPlayer == null) {
 				String music = musicList.getSelectedValue();
 				if (music == null) {
 					JOptionPane.showMessageDialog(this, "请先选择音乐");
@@ -110,7 +110,7 @@ public class MainFrame extends JFrame implements Runnable {
 		File[] files = musicDir.listFiles((dir1, name) -> {
 			name = name.toLowerCase();
 			// 识别的音频文件
-			String[] musicExtension = {".wav"};
+			String[] musicExtension = {".wav", ".aac", ".mp3", ".pcm"};
 			boolean pass = false;
 			for (String extension : musicExtension) {
 				if (name.endsWith(extension)) {
@@ -157,10 +157,15 @@ public class MainFrame extends JFrame implements Runnable {
 		try {
 			loadLrc(musicName);
 			File file = new File(musicDir, musicName);
-			audioStream = new AudioStream(new FileInputStream(file));
-			audioPlayer.start(audioStream);
+			Media media = new Media(file.toURI().toString());
+			mediaPlayer = new MediaPlayer(media);
+			mediaPlayer.setOnEndOfMedia(this::onMusicStop);
+			mediaPlayer.setOnError(() -> {
+				JOptionPane.showMessageDialog(this, "无法播放：" + media.getSource() + "\n" + mediaPlayer.getError().getMessage());
+				stopMusic();
+			});
+			mediaPlayer.play();
 			playButton.setText("■");
-			progressBar.setMaximum(audioStream.available());
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -211,18 +216,13 @@ public class MainFrame extends JFrame implements Runnable {
 		e.translate = lrc.translate;
 		lrcs.add(e);
 		lrcFrame.lrcs = lrcs;
-		lrcFrame.startTime = System.currentTimeMillis();
 	}
 
 	private synchronized void stopMusic() {
-		if (audioStream != null) {
-			audioPlayer.stop(audioStream);
-			try {
-				audioStream.close();
-				audioStream = null;
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		if (mediaPlayer != null) {
+			mediaPlayer.stop();
+			mediaPlayer.dispose();
+			mediaPlayer = null;
 		}
 		lrcFrame.lrcs = null;
 		playButton.setText("▶");
@@ -238,16 +238,9 @@ public class MainFrame extends JFrame implements Runnable {
 	public void run() {
 		while (true) {
 			synchronized (this) {
-				if (audioStream != null) {
-					try {
-						int available = audioStream.available();
-						progressBar.setValue(progressBar.getMaximum() - available);
-						if (available == 0) {
-							onMusicStop();
-						}
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+				if (mediaPlayer != null) {
+					progressBar.setMaximum((int) mediaPlayer.getTotalDuration().toMillis());
+					progressBar.setValue((int) mediaPlayer.getCurrentTime().toMillis());
 				}
 			}
 			try {
@@ -260,7 +253,9 @@ public class MainFrame extends JFrame implements Runnable {
 	}
 
 	private void onMusicStop() {
-		nextMusic();
+		synchronized (this) {
+			nextMusic();
+		}
 	}
 
 	private void nextMusic() {
@@ -280,7 +275,6 @@ public class MainFrame extends JFrame implements Runnable {
 		String name;
 		ProgressTextLabel text;
 		ProgressTextLabel translate;
-		long startTime;
 
 		LrcFrame() {
 			JPanel panel = new JPanel(new GridBagLayout());
@@ -304,32 +298,35 @@ public class MainFrame extends JFrame implements Runnable {
 		@Override
 		public void run() {
 			while (true) {
-				// 更新文本框文字
-				if (lrcs == null) {
-					text.setText("Lrc - View");
-					text.setProgress(-1);
-					translate.setText(null);
-				} else {
-					long curTime = System.currentTimeMillis() - startTime;
-					long lastTime = 0;
-					float progress = -1;
-					String t = name;
-					String tran = null;
-					for (Lrc lrc : lrcs) {
-						long time = lrc.time;
-						if (curTime > time) {
-							lastTime = time;
-							t = lrc.text;
-							tran = lrc.translate;
-						} else {
-							progress = (float) (curTime - lastTime) / (time - lastTime + 1);
-							break;
+				try {
+					// 更新文本框文字
+					if (lrcs == null || mediaPlayer == null) {
+						text.setText("Lrc - View");
+						text.setProgress(-1);
+						translate.setText(null);
+					} else {
+						long curTime = (long) mediaPlayer.getCurrentTime().toMillis();
+						long lastTime = 0;
+						float progress = -1;
+						String t = name;
+						String tran = null;
+						for (Lrc lrc : lrcs) {
+							long time = lrc.time;
+							if (curTime > time) {
+								lastTime = time;
+								t = lrc.text;
+								tran = lrc.translate;
+							} else {
+								progress = (float) (curTime - lastTime) / (time - lastTime + 1);
+								break;
+							}
 						}
+						text.setText(t);
+						text.setProgress(progress);
+						translate.setText(tran);
+						translate.setProgress(progress);
 					}
-					text.setText(t);
-					text.setProgress(progress);
-					translate.setText(tran);
-					translate.setProgress(progress);
+				} catch (NullPointerException ignore) {
 				}
 			}
 		}
