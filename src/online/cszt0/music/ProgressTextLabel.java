@@ -7,6 +7,7 @@ import java.awt.*;
  * @author 初始状态0
  * @date 2019/6/1 17:43
  */
+@SuppressWarnings("WeakerAccess")
 public class ProgressTextLabel extends JComponent {
 	private String text;
 	private float progress;

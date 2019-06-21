@@ -2,10 +2,13 @@ package online.cszt0.music;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -17,7 +20,7 @@ import java.util.regex.Pattern;
  * @author 初始状态0
  * @date 2019/5/22 20:56
  */
-@SuppressWarnings({"WeakerAccess","unused"})
+@SuppressWarnings({"WeakerAccess", "unused"})
 public final class Lrc {
 	private static final String OFFSET_LABEL = "offset";
 
@@ -69,7 +72,7 @@ public final class Lrc {
 		if (name.endsWith(".txt")) {
 			return parseFileAsRawText(file);
 		}
-		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
 			Pattern labelPattern = Pattern.compile("\\[\\s*(\\w+)\\s*:\\s*([^]]+)\\s*]");
 			Pattern timePattern = Pattern.compile("\\[\\s*(\\d+)\\s*:\\s*(\\d+)\\s*\\.\\s*(\\d+)\\s*](.*+)");
 			Lrc lrcInfo = new Lrc(file.getName());
@@ -111,7 +114,7 @@ public final class Lrc {
 				lrcInfo.statements.getLast().subText = line;
 			}
 			// 重新更新时间
-			if(offset!=0) {
+			if (offset != 0) {
 				for (Statement statement : lrcInfo.statements) {
 					statement.time += offset;
 				}
@@ -123,7 +126,7 @@ public final class Lrc {
 	}
 
 	private static Lrc parseFileAsRawText(File file) {
-		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
 			Lrc lrcInfo = new Lrc(file.getName());
 			String line;
 			while ((line = reader.readLine()) != null) {
