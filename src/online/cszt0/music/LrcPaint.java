@@ -1,7 +1,5 @@
 package online.cszt0.music;
 
-import sun.awt.image.IntegerComponentRaster;
-
 import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;

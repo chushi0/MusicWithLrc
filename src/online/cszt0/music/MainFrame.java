@@ -3,29 +3,14 @@ package online.cszt0.music;
 import com.sun.awt.AWTUtilities;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
-import sun.audio.AudioPlayer;
-import sun.audio.AudioStream;
-import sun.swing.ImageIconUIResource;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Stack;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.lang.Thread.sleep;
@@ -34,11 +19,11 @@ import static java.lang.Thread.sleep;
  * @author 初始状态0
  * @date 2019/5/22 18:49
  */
+@SuppressWarnings("WeakerAccess")
 public class MainFrame extends JFrame implements Runnable {
 
 	final File musicDir = new File("music");
 	final File lrcDir = new File("lrc");
-	final Pattern pattern = Pattern.compile("\\d+");
 
 	LrcFrame lrcFrame;
 
@@ -200,71 +185,29 @@ public class MainFrame extends JFrame implements Runnable {
 	private synchronized void playMusic(String musicName) {
 		stopMusic();
 		lastMusic.push(musicName);
-		try {
-			loadLrc(musicName);
-			File file = new File(musicDir, musicName);
-			Media media = new Media(file.toURI().toString());
-			mediaPlayer = new MediaPlayer(media);
-			mediaPlayer.setOnEndOfMedia(this::onMusicStop);
-			mediaPlayer.setOnError(() -> {
-				JOptionPane.showMessageDialog(this, "无法播放：" + media.getSource() + "\n" + mediaPlayer.getError().getMessage());
-				stopMusic();
-			});
-			mediaPlayer.play();
-			playButton.setText("■");
-			if (trayIcon != null) {
-				trayIcon.setToolTip("正在播放：" + musicName);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
+		loadLrc(musicName);
+		File file = new File(musicDir, musicName);
+		Media media = new Media(file.toURI().toString());
+		mediaPlayer = new MediaPlayer(media);
+		mediaPlayer.setOnEndOfMedia(this::onMusicStop);
+		mediaPlayer.setOnError(() -> {
+			JOptionPane.showMessageDialog(this, "无法播放：" + media.getSource() + "\n" + mediaPlayer.getError().getMessage());
+			stopMusic();
+		});
+		mediaPlayer.play();
+		playButton.setText("■");
+		if (trayIcon != null) {
+			trayIcon.setToolTip("正在播放：" + musicName);
 		}
 	}
 
-	private void loadLrc(String musicName) throws IOException {
+	private void loadLrc(String musicName) {
 		musicName = musicName.substring(0, musicName.lastIndexOf('.')) + ".lrc";
-		lrcFrame.lrcs = null;
-		lrcFrame.name = musicName.substring(0, musicName.lastIndexOf('.'));
-		ArrayList<Lrc> lrcs = new ArrayList<>();
-		try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(new File(lrcDir, musicName)), StandardCharsets.UTF_8))) {
-			String line;
-			while ((line = reader.readLine()) != null) {
-				line = line.trim();
-				if (line.isEmpty()) {
-					continue;
-				}
-				if (!line.startsWith("[")) {
-					lrcs.get(lrcs.size() - 1).translate = line;
-					continue;
-				}
-				int timeEnd = line.indexOf(']');
-				String timeString = line.substring(1, timeEnd);
-				Matcher matcher = pattern.matcher(timeString);
-				if (!matcher.find()) {
-					continue;
-				}
-				String minute = matcher.group();
-				if (!matcher.find()) {
-					continue;
-				}
-				String second = matcher.group();
-				if (!matcher.find()) {
-					continue;
-				}
-				String ms = matcher.group();
-				long time = Long.parseLong(minute) * 60 * 1000 + Long.parseLong(second) * 1000 + Long.parseLong(ms);
-				Lrc e = new Lrc();
-				e.time = time;
-				e.text = line.substring(timeEnd + 1);
-				lrcs.add(e);
-			}
+		File lrcFile = new File(lrcDir, musicName);
+		lrcFrame.lrc = Lrc.fromFile(lrcFile);
+		if (lrcFrame.lrc == null) {
+			lrcFrame.lrc = new Lrc(lrcFile.getName());
 		}
-		Lrc e = new Lrc();
-		Lrc lrc = lrcs.get(lrcs.size() - 1);
-		e.time = lrc.time + 5000;
-		e.text = lrc.text;
-		e.translate = lrc.translate;
-		lrcs.add(e);
-		lrcFrame.lrcs = lrcs;
 	}
 
 	private synchronized void stopMusic() {
@@ -276,7 +219,7 @@ public class MainFrame extends JFrame implements Runnable {
 		if (trayIcon != null) {
 			trayIcon.setToolTip("已停止");
 		}
-		lrcFrame.lrcs = null;
+		lrcFrame.lrc = null;
 		playButton.setText("▶");
 	}
 
@@ -323,8 +266,7 @@ public class MainFrame extends JFrame implements Runnable {
 	}
 
 	class LrcFrame extends JWindow implements Runnable {
-		ArrayList<Lrc> lrcs;
-		String name;
+		Lrc lrc;
 		ProgressTextLabel text;
 		ProgressTextLabel translate;
 
@@ -349,34 +291,21 @@ public class MainFrame extends JFrame implements Runnable {
 
 		@Override
 		public void run() {
+			//noinspection InfiniteLoopStatement
 			while (true) {
 				try {
 					// 更新文本框文字
-					if (lrcs == null || mediaPlayer == null) {
+					if (lrc == null || mediaPlayer == null) {
 						text.setText("Lrc - View");
 						text.setProgress(-1);
 						translate.setText(null);
 					} else {
 						long curTime = (long) mediaPlayer.getCurrentTime().toMillis();
-						long lastTime = 0;
-						float progress = -1;
-						String t = name;
-						String tran = null;
-						for (Lrc lrc : lrcs) {
-							long time = lrc.time;
-							if (curTime > time) {
-								lastTime = time;
-								t = lrc.text;
-								tran = lrc.translate;
-							} else {
-								progress = (float) (curTime - lastTime) / (time - lastTime + 1);
-								break;
-							}
-						}
-						text.setText(t);
-						text.setProgress(progress);
-						translate.setText(tran);
-						translate.setProgress(progress);
+						Lrc.Info info = lrc.getInfoByTime(curTime);
+						text.setText(info.text);
+						text.setProgress(info.progress);
+						translate.setText(info.subText);
+						translate.setProgress(info.progress);
 					}
 				} catch (NullPointerException ignore) {
 				}
