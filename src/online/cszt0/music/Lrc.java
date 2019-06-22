@@ -90,9 +90,11 @@ public final class Lrc {
 				break;
 			}
 		}
-		float subTextProgress = Math.min((float) (time - subTextStartTime) / (float) (subTextEndTime - subTextStartTime), 1f);
+		float subTextProgress = Math
+				.min((float) (time - subTextStartTime) / (float) (subTextEndTime - subTextStartTime), 1f);
 		// 返回
-		return new Info(res.text, res.subText, textProgress, textStart, textEnd, subTextProgress, subTextStart, subTextEnd);
+		return new Info(res.text, res.subText, textProgress, textStart, textEnd, subTextProgress, subTextStart,
+				subTextEnd);
 	}
 
 	public Info getInfoByIndex(int index) {
@@ -107,6 +109,85 @@ public final class Lrc {
 				return;
 			}
 		}
+		Statement statement = statements.getLast();
+		addMainBreak(statement, statement.text.length(), time);
+		if (statement.subText != null && !statement.subText.isEmpty()) {
+			addSubBreak(statement, statement.subText.length(), time);
+		}
+	}
+
+	public void addMainBreakByTime(int index, long time) {
+		if (index == 0) {
+			return;
+		}
+		Statement statement = getStatementByTime(time);
+		if (statement == null) {
+			return;
+		}
+		addMainBreak(statement, index, time);
+	}
+
+	public void addSubBreakByTime(int index, long time) {
+		if (index == 0) {
+			return;
+		}
+		Statement statement = getStatementByTime(time);
+		if (statement == null) {
+			return;
+		}
+		addSubBreak(statement, index, time);
+	}
+
+	private Statement getStatementByTime(long time) {
+		Statement res = null;
+		for (Statement statement : statements) {
+			if (statement.time <= time) {
+				res = statement;
+			} else {
+				return res;
+			}
+		}
+		return res;
+	}
+
+	private void addSubBreak(Statement statement, int index, long time) {
+		int[] breakPoints = statement.subTextBreakPoints;
+		long[] breakTimes = statement.subTextBreakTimes;
+		int count = breakPoints.length;
+		int insertIndex = getInsertIndex(breakPoints, index);
+		statement.subTextBreakPoints = new int[count + 1];
+		statement.subTextBreakTimes = new long[count + 1];
+		System.arraycopy(breakPoints, 0, statement.subTextBreakPoints, 0, insertIndex);
+		statement.subTextBreakPoints[insertIndex] = index;
+		System.arraycopy(breakPoints, insertIndex, statement.subTextBreakPoints, insertIndex + 1, count - insertIndex);
+		System.arraycopy(breakTimes, 0, statement.subTextBreakTimes, 0, insertIndex);
+		statement.subTextBreakTimes[insertIndex] = time;
+		System.arraycopy(breakTimes, insertIndex, statement.subTextBreakTimes, insertIndex + 1, count - insertIndex);
+	}
+
+	private void addMainBreak(Statement statement, int index, long time) {
+		int[] breakPoints = statement.textBreakPoints;
+		long[] breakTimes = statement.textBreakTimes;
+		int count = breakPoints.length;
+		int insertIndex = getInsertIndex(breakPoints, index);
+		statement.textBreakPoints = new int[count + 1];
+		statement.textBreakTimes = new long[count + 1];
+		System.arraycopy(breakPoints, 0, statement.textBreakPoints, 0, insertIndex);
+		statement.textBreakPoints[insertIndex] = index;
+		System.arraycopy(breakPoints, insertIndex, statement.textBreakPoints, insertIndex + 1, count - insertIndex);
+		System.arraycopy(breakTimes, 0, statement.textBreakTimes, 0, insertIndex);
+		statement.textBreakTimes[insertIndex] = time;
+		System.arraycopy(breakTimes, insertIndex, statement.textBreakTimes, insertIndex + 1, count - insertIndex);
+	}
+
+	private int getInsertIndex(int[] breakPoints, int index) {
+		int len = breakPoints.length;
+		for (int i = 0; i < len; i++) {
+			if (breakPoints[i] > index) {
+				return i;
+			}
+		}
+		return len;
 	}
 
 	public static Lrc fromFile(File file) {
@@ -114,7 +195,8 @@ public final class Lrc {
 		if (name.endsWith(".txt")) {
 			return parseFileAsRawText(file);
 		}
-		try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
+		try (BufferedReader reader = new BufferedReader(
+				new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
 			Pattern labelPattern = Pattern.compile("\\[\\s*(\\w+)\\s*:\\s*([^]]+)\\s*]");
 			Pattern timePattern = Pattern.compile("\\[\\s*(\\d+)\\s*:\\s*(\\d+)\\s*\\.\\s*(\\d+)\\s*]([^\\[]*)");
 			Lrc lrcInfo = new Lrc(file.getName());
@@ -155,8 +237,8 @@ public final class Lrc {
 					int index = text.length();
 					while (matcher.find()) {
 						breakPoints.add(index);
-						breakTimes.add(Long.parseLong(matcher.group(1)) * 60 * 1000 + Long.parseLong(matcher.group(2)) * 1000
-								+ Long.parseLong(matcher.group(3)));
+						breakTimes.add(Long.parseLong(matcher.group(1)) * 60 * 1000
+								+ Long.parseLong(matcher.group(2)) * 1000 + Long.parseLong(matcher.group(3)));
 						text = matcher.group(4);
 						statementBuilder.append(text);
 						index += text.length();
@@ -164,6 +246,9 @@ public final class Lrc {
 					statement.text = statementBuilder.toString();
 					statement.textBreakPoints = list2intArray(breakPoints);
 					statement.textBreakTimes = list2LongArray(breakTimes);
+					statement.subText = "";
+					statement.subTextBreakTimes = new long[0];
+					statement.subTextBreakPoints = new int[0];
 					lrcInfo.statements.add(statement);
 					continue;
 				}
@@ -182,8 +267,8 @@ public final class Lrc {
 				String text;
 				do {
 					breakPoints.add(index);
-					breakTimes.add(Long.parseLong(matcher.group(1)) * 60 * 1000 + Long.parseLong(matcher.group(2)) * 1000
-							+ Long.parseLong(matcher.group(3)));
+					breakTimes.add(Long.parseLong(matcher.group(1)) * 60 * 1000
+							+ Long.parseLong(matcher.group(2)) * 1000 + Long.parseLong(matcher.group(3)));
 					text = matcher.group(4);
 					subTextBuilder.append(text);
 					index += text.length();
@@ -197,6 +282,16 @@ public final class Lrc {
 			if (offset != 0) {
 				for (Statement statement : lrcInfo.statements) {
 					statement.time += offset;
+					int size = statement.textBreakTimes.length;
+					for (int i = 0; i < size; i++) {
+						statement.textBreakTimes[i] += offset;
+					}
+					if(statement.subTextBreakPoints != null) {
+						size = statement.subTextBreakTimes.length;
+						for (int i = 0; i < size; i++) {
+							statement.subTextBreakTimes[i] += offset;
+						}
+					}
 				}
 			}
 			return lrcInfo;
@@ -224,7 +319,8 @@ public final class Lrc {
 	}
 
 	private static Lrc parseFileAsRawText(File file) {
-		try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
+		try (BufferedReader reader = new BufferedReader(
+				new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
 			Lrc lrcInfo = new Lrc(file.getName());
 			String line;
 			while ((line = reader.readLine()) != null) {
@@ -346,9 +442,28 @@ public final class Lrc {
 		// 歌词信息
 		for (Statement statement : statements) {
 			long time = statement.time;
-			printStream.printf("[%d:%d.%d]%s%n", time / 60 / 1000, time / 1000 % 60, time % 1000, statement.text);
+			printStream.printf("[%d:%d.%d]", time / 60 / 1000, time / 1000 % 60, time % 1000);
+			// 考虑到关键点
+			int textBreakPointCount = statement.textBreakPoints.length;
+			int lastIndex = 0;
+			for (int i = 0; i < textBreakPointCount; i++) {
+				time = statement.textBreakTimes[i];
+				printStream.printf("%s[%d:%d.%d]", statement.text.substring(lastIndex, statement.textBreakPoints[i]),
+						time / 60 / 1000, time / 1000 % 60, time % 1000);
+				lastIndex = statement.textBreakPoints[i];
+			}
+			printStream.println(statement.text.substring(lastIndex));
 			if (!statement.subText.isEmpty()) {
-				printStream.println(statement.subText);
+				int subTextBreakPointCount = statement.subTextBreakPoints.length;
+				lastIndex = 0;
+				for (int i = 0; i < subTextBreakPointCount; i++) {
+					time = statement.subTextBreakTimes[i];
+					printStream.printf("%s[%d:%d.%d]",
+							statement.subText.substring(lastIndex, statement.subTextBreakPoints[i]), time / 60 / 1000,
+							time / 1000 % 60, time % 1000);
+					lastIndex = statement.subTextBreakPoints[i];
+				}
+				printStream.println(statement.subText.substring(lastIndex));
 			}
 		}
 	}
@@ -374,7 +489,8 @@ public final class Lrc {
 			this.subTextEnd = this.subText.length();
 		}
 
-		public Info(String text, String subText, float textProgress, int textStart, int textEnd, float subTextProgress, int subTextStart, int subTextEnd) {
+		public Info(String text, String subText, float textProgress, int textStart, int textEnd, float subTextProgress,
+		            int subTextStart, int subTextEnd) {
 			this.text = text;
 			this.subText = subText;
 			this.textProgress = textProgress;
