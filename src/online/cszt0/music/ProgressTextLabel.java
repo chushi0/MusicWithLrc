@@ -32,7 +32,7 @@ public class ProgressTextLabel extends JComponent {
 		setPreferredSize(new Dimension(Math.min(1920, width), height));
 	}
 
-	public void setProgress(float progress) {
+	public void setProgress(float progress, int start, int end) {
 		if (text == null) {
 			return;
 		}
@@ -40,7 +40,8 @@ public class ProgressTextLabel extends JComponent {
 		if (progress < 0) {
 			this.progress = fontMetrics.stringWidth(text);
 		} else {
-			this.progress = fontMetrics.stringWidth(text) * progress;
+			this.progress = fontMetrics.stringWidth(text.substring(0, start)) +
+					fontMetrics.stringWidth(text.substring(start, end)) * progress;
 		}
 		repaint();
 	}

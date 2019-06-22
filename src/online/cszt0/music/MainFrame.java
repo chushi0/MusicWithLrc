@@ -11,7 +11,6 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
-import java.util.regex.Pattern;
 
 import static java.lang.Thread.sleep;
 
@@ -297,15 +296,15 @@ public class MainFrame extends JFrame implements Runnable {
 					// 更新文本框文字
 					if (lrc == null || mediaPlayer == null) {
 						text.setText("Lrc - View");
-						text.setProgress(-1);
+						text.setProgress(-1, 0, 0);
 						translate.setText(null);
 					} else {
 						long curTime = (long) mediaPlayer.getCurrentTime().toMillis();
 						Lrc.Info info = lrc.getInfoByTime(curTime);
 						text.setText(info.text);
-						text.setProgress(info.progress);
+						text.setProgress(info.textProgress, info.textStart, info.textEnd);
 						translate.setText(info.subText);
-						translate.setProgress(info.progress);
+						translate.setProgress(info.subTextProgress, info.subTextStart, info.subTextEnd);
 					}
 				} catch (NullPointerException ignore) {
 				}

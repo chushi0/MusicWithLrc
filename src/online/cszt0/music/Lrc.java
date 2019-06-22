@@ -3,12 +3,12 @@ package online.cszt0.music;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -41,16 +41,58 @@ public final class Lrc {
 	}
 
 	public Info getInfoByTime(long time) {
-		Statement res = new Statement();
-		res.text = filename;
+		Statement res = null;
+		long endTime = 5000;
 		for (Statement statement : statements) {
 			if (statement.time <= time) {
 				res = statement;
+				endTime = statement.time + 5000;
 			} else {
-				return new Info(res.text, res.subText, (float) (time - res.time) / (float) (statement.time - res.time));
+				endTime = statement.time;
+				break;
 			}
 		}
-		return new Info(res.text, res.subText, Math.min((time - res.time) / 5000f, 1f));
+		if (res == null) {
+			return new Info(filename, null, Math.min((float) time / (float) endTime, 1f));
+		}
+		// 歌词的中间关键点
+		int textStart = 0;
+		int textEnd = res.text.length();
+		long textStartTime = res.time;
+		long textEndTime = endTime;
+		int textBreakSize = res.textBreakPoints.length;
+		for (int i = 0; i < textBreakSize; i++) {
+			long breakTime = res.textBreakTimes[i];
+			if (time >= breakTime) {
+				textStart = res.textBreakPoints[i];
+				textStartTime = breakTime;
+			} else {
+				textEnd = res.textBreakPoints[i];
+				textEndTime = breakTime;
+				break;
+			}
+		}
+		float textProgress = Math.min((float) (time - textStartTime) / (float) (textEndTime - textStartTime), 1f);
+		// 翻译的中间关键点
+		int subTextStart = 0;
+		int subTextEnd = res.subText.length();
+		long subTextStartTime = res.time;
+		long subTextEndTime = endTime;
+		int subTextBreakSize = res.subTextBreakPoints.length;
+		for (int i = 0; i < subTextBreakSize; i++) {
+			long breakTime = res.subTextBreakTimes[i];
+			if (time >= breakTime) {
+				subTextStart = res.subTextBreakPoints[i];
+				subTextStartTime = breakTime;
+			} else {
+				subTextEnd = res.subTextBreakPoints[i];
+				subTextEndTime = breakTime;
+				break;
+			}
+		}
+		float subTextProgress = Math.min((float) (time - subTextStartTime) / (float) (subTextEndTime - subTextStartTime), 1f);
+		// 返回
+		return new Info(res.text, res.subText, textProgress, textStart, textEnd, subTextProgress, subTextStart, subTextEnd);
 	}
 
 	public Info getInfoByIndex(int index) {
@@ -74,7 +116,7 @@ public final class Lrc {
 		}
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
 			Pattern labelPattern = Pattern.compile("\\[\\s*(\\w+)\\s*:\\s*([^]]+)\\s*]");
-			Pattern timePattern = Pattern.compile("\\[\\s*(\\d+)\\s*:\\s*(\\d+)\\s*\\.\\s*(\\d+)\\s*](.*+)");
+			Pattern timePattern = Pattern.compile("\\[\\s*(\\d+)\\s*:\\s*(\\d+)\\s*\\.\\s*(\\d+)\\s*]([^\\[]*)");
 			Lrc lrcInfo = new Lrc(file.getName());
 			String line;
 			long offset = 0;
@@ -100,18 +142,56 @@ public final class Lrc {
 				}
 				// 歌词
 				matcher = timePattern.matcher(line);
-				if (matcher.find() && matcher.start() == 0) {
+				boolean find = matcher.find();
+				if (find && matcher.start() == 0) {
 					long time = Long.parseLong(matcher.group(1)) * 60 * 1000 + Long.parseLong(matcher.group(2)) * 1000
 							+ Long.parseLong(matcher.group(3));
 					String text = matcher.group(4);
 					Statement statement = new Statement();
 					statement.time = time;
-					statement.text = text;
+					StringBuilder statementBuilder = new StringBuilder(text);
+					ArrayList<Integer> breakPoints = new ArrayList<>();
+					ArrayList<Long> breakTimes = new ArrayList<>();
+					int index = text.length();
+					while (matcher.find()) {
+						breakPoints.add(index);
+						breakTimes.add(Long.parseLong(matcher.group(1)) * 60 * 1000 + Long.parseLong(matcher.group(2)) * 1000
+								+ Long.parseLong(matcher.group(3)));
+						text = matcher.group(4);
+						statementBuilder.append(text);
+						index += text.length();
+					}
+					statement.text = statementBuilder.toString();
+					statement.textBreakPoints = list2intArray(breakPoints);
+					statement.textBreakTimes = list2LongArray(breakTimes);
 					lrcInfo.statements.add(statement);
 					continue;
 				}
 				// 译文
-				lrcInfo.statements.getLast().subText = line;
+				if (!find) {
+					Statement statement = lrcInfo.statements.getLast();
+					statement.subText = line;
+					statement.subTextBreakPoints = new int[0];
+					statement.subTextBreakTimes = new long[0];
+					continue;
+				}
+				int index = matcher.start();
+				StringBuilder subTextBuilder = new StringBuilder(line.substring(0, index));
+				ArrayList<Integer> breakPoints = new ArrayList<>();
+				ArrayList<Long> breakTimes = new ArrayList<>();
+				String text;
+				do {
+					breakPoints.add(index);
+					breakTimes.add(Long.parseLong(matcher.group(1)) * 60 * 1000 + Long.parseLong(matcher.group(2)) * 1000
+							+ Long.parseLong(matcher.group(3)));
+					text = matcher.group(4);
+					subTextBuilder.append(text);
+					index += text.length();
+				} while (matcher.find());
+				Statement statement = lrcInfo.statements.getLast();
+				statement.subText = subTextBuilder.toString();
+				statement.subTextBreakPoints = list2intArray(breakPoints);
+				statement.subTextBreakTimes = list2LongArray(breakTimes);
 			}
 			// 重新更新时间
 			if (offset != 0) {
@@ -123,6 +203,24 @@ public final class Lrc {
 		} catch (IOException e) {
 			return null;
 		}
+	}
+
+	private static long[] list2LongArray(ArrayList<Long> list) {
+		int size = list.size();
+		long[] res = new long[size];
+		for (int i = 0; i < size; i++) {
+			res[i] = list.get(i);
+		}
+		return res;
+	}
+
+	private static int[] list2intArray(ArrayList<Integer> list) {
+		int size = list.size();
+		int[] res = new int[size];
+		for (int i = 0; i < size; i++) {
+			res[i] = list.get(i);
+		}
+		return res;
 	}
 
 	private static Lrc parseFileAsRawText(File file) {
@@ -187,6 +285,10 @@ public final class Lrc {
 	public synchronized void clearTime() {
 		for (Statement statement : statements) {
 			statement.time = Long.MAX_VALUE;
+			statement.textBreakTimes = new long[0];
+			statement.textBreakPoints = new int[0];
+			statement.subTextBreakPoints = new int[0];
+			statement.subTextBreakTimes = new long[0];
 		}
 	}
 
@@ -197,9 +299,19 @@ public final class Lrc {
 	public synchronized void clearTime(int position) {
 		int size = statements.size();
 		if (position == size - 1) {
-			statements.getLast().time = Long.MAX_VALUE;
+			Statement statement = statements.getLast();
+			statement.time = Long.MAX_VALUE;
+			statement.textBreakTimes = new long[0];
+			statement.textBreakPoints = new int[0];
+			statement.subTextBreakPoints = new int[0];
+			statement.subTextBreakTimes = new long[0];
 		} else {
-			statements.get(position).time = statements.get(position + 1).time;
+			Statement statement = statements.get(position);
+			statement.time = statements.get(position + 1).time;
+			statement.textBreakTimes = new long[0];
+			statement.textBreakPoints = new int[0];
+			statement.subTextBreakPoints = new int[0];
+			statement.subTextBreakTimes = new long[0];
 		}
 	}
 
@@ -244,12 +356,33 @@ public final class Lrc {
 	public static class Info {
 		public final String text;
 		public final String subText;
-		public final float progress;
+		public final float textProgress;
+		public final int textStart;
+		public final int textEnd;
+		public final float subTextProgress;
+		public final int subTextStart;
+		public final int subTextEnd;
 
 		public Info(String text, String subText, float progress) {
 			this.text = text;
+			this.subText = subText == null ? "" : subText;
+			this.textProgress = progress;
+			this.subTextProgress = progress;
+			this.textStart = 0;
+			this.textEnd = text.length();
+			this.subTextStart = 0;
+			this.subTextEnd = this.subText.length();
+		}
+
+		public Info(String text, String subText, float textProgress, int textStart, int textEnd, float subTextProgress, int subTextStart, int subTextEnd) {
+			this.text = text;
 			this.subText = subText;
-			this.progress = progress;
+			this.textProgress = textProgress;
+			this.textStart = textStart;
+			this.textEnd = textEnd;
+			this.subTextProgress = subTextProgress;
+			this.subTextStart = subTextStart;
+			this.subTextEnd = subTextEnd;
 		}
 	}
 
@@ -257,5 +390,9 @@ public final class Lrc {
 		private long time;
 		private String text;
 		private String subText;
+		private int[] textBreakPoints;
+		private long[] textBreakTimes;
+		private int[] subTextBreakPoints;
+		private long[] subTextBreakTimes;
 	}
 }
