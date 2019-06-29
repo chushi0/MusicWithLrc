@@ -6,6 +6,10 @@ import javafx.scene.media.MediaPlayer;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
@@ -19,10 +23,10 @@ import static java.lang.Thread.sleep;
  * @date 2019/5/22 18:49
  */
 @SuppressWarnings("WeakerAccess")
-public class MainFrame extends JFrame implements Runnable {
+public class MainFrame extends JFrame {
 
-	final File musicDir = new File("music");
-	final File lrcDir = new File("lrc");
+	static final File musicDir = new File("music");
+	static final File lrcDir = new File("lrc");
 
 	LrcFrame lrcFrame;
 
@@ -71,8 +75,19 @@ public class MainFrame extends JFrame implements Runnable {
 			@Override
 			public void mouseClicked(MouseEvent e) {
 				super.mouseClicked(e);
-				if (e.getClickCount() == 2) {
+				int index = musicList.locationToIndex(new Point(e.getX(), e.getY()));
+				musicList.setSelectedIndex(index);
+				if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1) {
 					playMusic(musicList.getSelectedValue());
+				}
+				if (e.getButton() == MouseEvent.BUTTON3) {
+					String music = musicList.getSelectedValue();
+					JMenu menu = new JMenu();
+					JMenuItem adjust = new JMenuItem("调整歌词");
+					adjust.addActionListener(l -> AdjustFrame.showFrame(music));
+					menu.add(adjust);
+					JPopupMenu popupMenu = menu.getPopupMenu();
+					popupMenu.show(musicList, e.getX(), e.getY());
 				}
 			}
 		});
@@ -94,7 +109,7 @@ public class MainFrame extends JFrame implements Runnable {
 			lastMusic.peek();
 		});
 		nextButton.addActionListener(event -> nextMusic());
-		Thread thread = new Thread(this);
+		Thread thread = new Thread(this::run);
 		thread.setDaemon(true);
 		thread.start();
 	}
@@ -228,8 +243,7 @@ public class MainFrame extends JFrame implements Runnable {
 		super.dispose();
 	}
 
-	@Override
-	public void run() {
+	private void run() {
 		while (true) {
 			synchronized (this) {
 				if (mediaPlayer != null) {
@@ -264,7 +278,7 @@ public class MainFrame extends JFrame implements Runnable {
 		}
 	}
 
-	class LrcFrame extends JWindow implements Runnable {
+	class LrcFrame extends JWindow {
 		Lrc lrc;
 		ProgressTextLabel text;
 		ProgressTextLabel translate;
@@ -283,14 +297,12 @@ public class MainFrame extends JFrame implements Runnable {
 			gridBagConstraints.gridy = 1;
 			panel.add(translate, gridBagConstraints);
 			setContentPane(panel);
-			Thread thread = new Thread(this);
+			Thread thread = new Thread(this::run);
 			thread.setDaemon(true);
 			thread.start();
 		}
 
-		@Override
-		public void run() {
-			//noinspection InfiniteLoopStatement
+		private void run() {
 			while (true) {
 				try {
 					// 更新文本框文字
@@ -312,5 +324,4 @@ public class MainFrame extends JFrame implements Runnable {
 			}
 		}
 	}
-
 }

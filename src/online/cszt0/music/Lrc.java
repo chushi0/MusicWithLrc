@@ -7,11 +7,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -95,6 +97,17 @@ public final class Lrc {
 		// 返回
 		return new Info(res.text, res.subText, textProgress, textStart, textEnd, subTextProgress, subTextStart,
 				subTextEnd);
+	}
+
+	public int getIndexByTime(long time) {
+		int index = -1;
+		for (Statement statement : statements) {
+			if (statement.time > time) {
+				break;
+			}
+			index++;
+		}
+		return index;
 	}
 
 	public Info getInfoByIndex(int index) {
@@ -286,7 +299,7 @@ public final class Lrc {
 					for (int i = 0; i < size; i++) {
 						statement.textBreakTimes[i] += offset;
 					}
-					if(statement.subTextBreakPoints != null) {
+					if (statement.subTextBreakPoints != null) {
 						size = statement.subTextBreakTimes.length;
 						for (int i = 0; i < size; i++) {
 							statement.subTextBreakTimes[i] += offset;
@@ -352,14 +365,20 @@ public final class Lrc {
 			if (statement.time <= time) {
 				res = statement;
 			} else {
-				assert res != null;
-				res.text = main;
-				res.subText = sub;
+				break;
 			}
 		}
 		assert res != null;
-		res.text = main;
-		res.subText = sub;
+		if (!Objects.equals(res.text, main)) {
+			res.text = main;
+			res.textBreakPoints = new int[0];
+			res.textBreakTimes = new long[0];
+		}
+		if (!Objects.equals(res.subText, sub)) {
+			res.subText = sub;
+			res.subTextBreakPoints = new int[0];
+			res.subTextBreakTimes = new long[0];
+		}
 	}
 
 	public String[] toStringArray() {
@@ -433,7 +452,12 @@ public final class Lrc {
 	}
 
 	public void writeToStream(OutputStream outputStream) {
-		PrintStream printStream = new PrintStream(outputStream);
+		PrintStream printStream;
+		try {
+			printStream = new PrintStream(outputStream,false, StandardCharsets.UTF_8.name());
+		} catch (UnsupportedEncodingException e) {
+			throw new RuntimeException(e);
+		}
 		// 元信息
 		Set<HashMap.Entry<String, String>> entries = infoMap.entrySet();
 		for (HashMap.Entry<String, String> entry : entries) {
@@ -466,6 +490,10 @@ public final class Lrc {
 				printStream.println(statement.subText.substring(lastIndex));
 			}
 		}
+	}
+
+	public long getStartTimeByIndex(int index) {
+		return statements.get(index).time;
 	}
 
 	public static class Info {
