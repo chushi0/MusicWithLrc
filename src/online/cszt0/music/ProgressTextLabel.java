@@ -11,7 +11,7 @@ import java.awt.*;
 public class ProgressTextLabel extends JComponent {
 	private String text;
 	private float progress;
-	private LrcPaint gradientPaint = new LrcPaint();
+	private LrcPaint gradientPaint = new LrcPaint(0xff0000, 0xffffff);
 
 	public void setText(String text) {
 		this.text = text;
@@ -30,6 +30,14 @@ public class ProgressTextLabel extends JComponent {
 		int width = fontMetrics.stringWidth(text);
 		int height = fontMetrics.getHeight();
 		setPreferredSize(new Dimension(Math.min(1920, width), height));
+	}
+
+	public void setReachedColor(int reachedColor) {
+		gradientPaint.setReachedColor(reachedColor);
+	}
+
+	public void setUnreachedColor(int unreachedColor) {
+		gradientPaint.setUnreachedColor(unreachedColor);
 	}
 
 	public void setProgress(float progress, int start, int end) {

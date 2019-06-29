@@ -4,6 +4,7 @@ package online.cszt0.music;
  * @author 初始状态0
  * @date 2019/6/4 0:14
  */
+@SuppressWarnings("WeakerAccess")
 public class LimitStack<T> {
 	private Object[] stack;
 	private int pointer;

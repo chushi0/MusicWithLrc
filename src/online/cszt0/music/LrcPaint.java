@@ -12,12 +12,37 @@ import java.awt.image.WritableRaster;
  * @author 初始状态0
  * @date 2019/6/1 18:04
  */
+@SuppressWarnings("WeakerAccess")
 public class LrcPaint implements Paint {
 
 	private static DirectColorModel directColorModel = new DirectColorModel(24, 0xff0000, 0x00ff00, 0x0000ff);
 	private float progress;
 	private float left;
 	private final IPaintContext context = new IPaintContext();
+
+	private int[] reachedColor;
+	private int[] unreachedColor;
+
+	public LrcPaint(int reachedColor, int unreachedColor) {
+		setReachedColor(reachedColor);
+		setUnreachedColor(unreachedColor);
+	}
+
+	public void setUnreachedColor(int unreachedColor) {
+		this.unreachedColor = new int[]{
+				(unreachedColor >> 16) & 0xff,
+				(unreachedColor >> 8) & 0xff,
+				unreachedColor & 0xff
+		};
+	}
+
+	public void setReachedColor(int reachedColor) {
+		this.reachedColor = new int[]{
+				(reachedColor >> 16) & 0xff,
+				(reachedColor >> 8) & 0xff,
+				reachedColor & 0xff
+		};
+	}
 
 	public void setProgress(float progress) {
 		this.progress = progress;
@@ -51,14 +76,12 @@ public class LrcPaint implements Paint {
 		@Override
 		public Raster getRaster(int x, int y, int w, int h) {
 			WritableRaster raster = directColorModel.createCompatibleWritableRaster(w, h);
-			final int[] blue = {0, 0, 0xff};
-			final int[] white = {0xff, 0xff, 0xff};
 			for (int i = 0; i < w; i++) {
 				for (int j = 0; j < h; j++) {
 					if (x - left + i < progress) {
-						raster.setPixel(i, j, blue);
+						raster.setPixel(i, j, reachedColor);
 					} else {
-						raster.setPixel(i, j, white);
+						raster.setPixel(i, j, unreachedColor);
 					}
 				}
 			}
