@@ -29,7 +29,7 @@ public class ProgressTextLabel extends JComponent {
 		FontMetrics fontMetrics = getFontMetrics(getFont());
 		int width = fontMetrics.stringWidth(text);
 		int height = fontMetrics.getHeight();
-		setPreferredSize(new Dimension(Math.min(1920, width), height));
+		setPreferredSize(new Dimension(Math.min(getParent().getWidth(), width), height));
 	}
 
 	public void setReachedColor(int reachedColor) {

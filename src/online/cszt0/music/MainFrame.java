@@ -305,6 +305,7 @@ public class MainFrame extends JFrame implements Runnable {
 						text.setProgress(info.textProgress, info.textStart, info.textEnd);
 						translate.setText(info.subText);
 						translate.setProgress(info.subTextProgress, info.subTextStart, info.subTextEnd);
+						setAlwaysOnTop(true);
 					}
 				} catch (NullPointerException ignore) {
 				}
