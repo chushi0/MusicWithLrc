@@ -655,11 +655,6 @@ public class AdjustFrame extends JFrame {
 				mainLabel.setText(null);
 				translateLabel.setText(null);
 			}
-			try {
-				Thread.sleep(10);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
 		}
 	}
 }
