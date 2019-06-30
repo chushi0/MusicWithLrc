@@ -357,6 +357,7 @@ public final class Lrc {
 		}
 	}
 
+	@SuppressWarnings("BooleanMethodIsAlwaysInverted")
 	public boolean isStatementEditableByTime(long time) {
 		if (statements.isEmpty()) {
 			return false;

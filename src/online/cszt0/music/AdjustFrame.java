@@ -34,6 +34,7 @@ public class AdjustFrame extends JFrame {
 	JScrollPane lrcListScrollPane;
 	JLabel statusLabel;
 	JLabel timeLabel;
+	JSlider slider;
 	ProgressTextLabel mainLabel;
 	ProgressTextLabel translateLabel;
 
@@ -43,6 +44,7 @@ public class AdjustFrame extends JFrame {
 	JCheckBoxMenuItem repeat;
 
 	volatile boolean lockListSelection;
+	volatile boolean lockSliderValue;
 
 	MediaPlayer mediaPlayer;
 	Lrc lrc;
@@ -62,8 +64,12 @@ public class AdjustFrame extends JFrame {
 		statusLabel = new JLabel("已停止");
 		timeLabel = new JLabel();
 		timeLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+		slider = new JSlider();
+		slider.setMinimum(0);
+		slider.setMaximum(0);
 		topPanel.add(statusLabel, BorderLayout.WEST);
 		topPanel.add(timeLabel, BorderLayout.EAST);
+		topPanel.add(slider, BorderLayout.SOUTH);
 		rightContentPanel.add(topPanel, BorderLayout.NORTH);
 		JPanel centerPanel = new JPanel(new GridBagLayout());
 		mainLabel = new ProgressTextLabel() {
@@ -182,6 +188,27 @@ public class AdjustFrame extends JFrame {
 			public void mouseClicked(MouseEvent e) {
 				super.mouseClicked(e);
 				JOptionPane.showInputDialog(null, "当前播放进度：", "信息", JOptionPane.INFORMATION_MESSAGE, null, null, timeLabel.getText());
+			}
+		});
+
+		slider.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mousePressed(MouseEvent e) {
+				super.mousePressed(e);
+				//noinspection SynchronizeOnNonFinalField
+				synchronized (slider) {
+					lockSliderValue = true;
+				}
+			}
+
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				super.mouseReleased(e);
+				mediaPlayer.seek(new Duration(slider.getValue()));
+				//noinspection SynchronizeOnNonFinalField
+				synchronized (slider) {
+					lockSliderValue = false;
+				}
 			}
 		});
 
@@ -515,6 +542,10 @@ public class AdjustFrame extends JFrame {
 		mediaPlayer = new MediaPlayer(media);
 		mediaPlayer.setOnEndOfMedia(this::onMusicStop);
 		mediaPlayer.setOnError(this::dispose);
+		mediaPlayer.setOnReady(() -> {
+			slider.setMaximum((int) mediaPlayer.getTotalDuration().toMillis());
+			slider.setValue(0);
+		});
 	}
 
 	private boolean loadLrc(String musicName) {
@@ -583,6 +614,13 @@ public class AdjustFrame extends JFrame {
 		while (true) {
 			if (lrc != null && mediaPlayer != null) {
 				long playTime = getPlayTime();
+				//noinspection SynchronizeOnNonFinalField
+				synchronized (slider) {
+					if (!lockSliderValue) {
+						slider.setValue((int) playTime);
+					}
+				}
+				playTime = slider.getValue();
 				timeLabel.setText(String.format("%d:%02d.%03d(%,03d)", playTime / 1000 / 60, playTime / 1000 % 60, playTime % 1000, playTime));
 				// 更新歌词
 				Lrc.Info info = lrc.getInfoByTime(playTime);
