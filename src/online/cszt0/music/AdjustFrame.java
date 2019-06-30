@@ -238,9 +238,11 @@ public class AdjustFrame extends JFrame {
 
 		playButton.addActionListener(e -> {
 			if (mediaPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
+				long playTime = getPlayTime();
 				mediaPlayer.pause();
 				playButton.setText("播放");
 				statusLabel.setText("已暂停");
+				mediaPlayer.seek(new Duration(playTime));
 			} else {
 				ensurePlayMusic();
 			}
@@ -652,6 +654,11 @@ public class AdjustFrame extends JFrame {
 			} else {
 				mainLabel.setText(null);
 				translateLabel.setText(null);
+			}
+			try {
+				Thread.sleep(10);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
 			}
 		}
 	}
