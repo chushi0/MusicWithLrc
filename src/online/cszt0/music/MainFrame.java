@@ -205,7 +205,7 @@ public class MainFrame extends JFrame {
 		mediaPlayer = new MediaPlayer(media);
 		mediaPlayer.setOnEndOfMedia(this::onMusicStop);
 		mediaPlayer.setOnError(() -> {
-			JOptionPane.showMessageDialog(this, "无法播放：" + media.getSource() + "\n" + mediaPlayer.getError().getMessage());
+			JOptionPane.showMessageDialog(this, "无法播放：" + media.getSource() + "\n" + mediaPlayer.getError().getLocalizedMessage());
 			stopMusic();
 		});
 		mediaPlayer.play();

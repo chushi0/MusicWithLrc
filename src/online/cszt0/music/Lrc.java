@@ -1,12 +1,15 @@
 package online.cszt0.music;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -14,6 +17,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -393,8 +397,16 @@ public final class Lrc {
 
 	public synchronized void setStatementByIndex(int position, String main, String sub) {
 		Statement statement = statements.get(position);
-		statement.text = main;
-		statement.subText = sub;
+		if (!Objects.equals(statement.text, main)) {
+			statement.text = main;
+			statement.textBreakPoints = new int[0];
+			statement.textBreakTimes = new long[0];
+		}
+		if (!Objects.equals(statement.subText, sub)) {
+			statement.subText = sub;
+			statement.subTextBreakPoints = new int[0];
+			statement.subTextBreakTimes = new long[0];
+		}
 	}
 
 	public synchronized void clearTime() {
@@ -441,7 +453,7 @@ public final class Lrc {
 		statements.add(position + 1, statement);
 	}
 
-	public void addBefore(int position) {
+	public synchronized void addBefore(int position) {
 		Statement statement = new Statement();
 		Statement curStatement = statements.get(position);
 		statement.time = curStatement.time;
@@ -454,7 +466,7 @@ public final class Lrc {
 	public void writeToStream(OutputStream outputStream) {
 		PrintStream printStream;
 		try {
-			printStream = new PrintStream(outputStream,false, StandardCharsets.UTF_8.name());
+			printStream = new PrintStream(outputStream, false, StandardCharsets.UTF_8.name());
 		} catch (UnsupportedEncodingException e) {
 			throw new RuntimeException(e);
 		}
@@ -465,30 +477,116 @@ public final class Lrc {
 		}
 		// 歌词信息
 		for (Statement statement : statements) {
-			long time = statement.time;
-			printStream.printf("[%d:%d.%d]", time / 60 / 1000, time / 1000 % 60, time % 1000);
-			// 考虑到关键点
-			int textBreakPointCount = statement.textBreakPoints.length;
-			int lastIndex = 0;
-			for (int i = 0; i < textBreakPointCount; i++) {
-				time = statement.textBreakTimes[i];
-				printStream.printf("%s[%d:%d.%d]", statement.text.substring(lastIndex, statement.textBreakPoints[i]),
-						time / 60 / 1000, time / 1000 % 60, time % 1000);
-				lastIndex = statement.textBreakPoints[i];
+			printStatement(printStream, statement);
+		}
+	}
+
+	public String getStatementText(int index) {
+		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+		PrintStream printStream = new PrintStream(byteArrayOutputStream);
+		printStatement(printStream, statements.get(index));
+		String s = new String(byteArrayOutputStream.toByteArray());
+		return s.substring(0, s.length() - 1);
+	}
+
+	public boolean replaceStatement(String statementText, int position) {
+		Pattern timePattern = Pattern.compile("\\[\\s*(\\d+)\\s*:\\s*(\\d+)\\s*\\.\\s*(\\d+)\\s*]([^\\[]*)");
+		Scanner scanner = new Scanner(statementText.replace("\r", ""));
+		String line = scanner.nextLine();
+		line = line.trim();
+		Matcher matcher;
+		Statement statement = new Statement();
+		// 歌词
+		matcher = timePattern.matcher(line);
+		boolean find = matcher.find();
+		if (find && matcher.start() == 0) {
+			long time = Long.parseLong(matcher.group(1)) * 60 * 1000 + Long.parseLong(matcher.group(2)) * 1000
+					+ Long.parseLong(matcher.group(3));
+			String text = matcher.group(4);
+			statement.time = time;
+			StringBuilder statementBuilder = new StringBuilder(text);
+			ArrayList<Integer> breakPoints = new ArrayList<>();
+			ArrayList<Long> breakTimes = new ArrayList<>();
+			int index = text.length();
+			while (matcher.find()) {
+				breakPoints.add(index);
+				breakTimes.add(Long.parseLong(matcher.group(1)) * 60 * 1000
+						+ Long.parseLong(matcher.group(2)) * 1000 + Long.parseLong(matcher.group(3)));
+				text = matcher.group(4);
+				statementBuilder.append(text);
+				index += text.length();
 			}
-			printStream.println(statement.text.substring(lastIndex));
-			if (!statement.subText.isEmpty()) {
-				int subTextBreakPointCount = statement.subTextBreakPoints.length;
-				lastIndex = 0;
-				for (int i = 0; i < subTextBreakPointCount; i++) {
-					time = statement.subTextBreakTimes[i];
-					printStream.printf("%s[%d:%d.%d]",
-							statement.subText.substring(lastIndex, statement.subTextBreakPoints[i]), time / 60 / 1000,
-							time / 1000 % 60, time % 1000);
-					lastIndex = statement.subTextBreakPoints[i];
-				}
-				printStream.println(statement.subText.substring(lastIndex));
+			statement.text = statementBuilder.toString();
+			statement.textBreakPoints = list2intArray(breakPoints);
+			statement.textBreakTimes = list2LongArray(breakTimes);
+			statement.subText = "";
+			statement.subTextBreakTimes = new long[0];
+			statement.subTextBreakPoints = new int[0];
+		} else {
+			return false;
+		}
+		// 翻译
+		if (scanner.hasNext()) {
+			line = scanner.nextLine();
+			line = line.trim();
+			matcher = timePattern.matcher(line);
+			find = matcher.find();
+			// 译文
+			if (!find) {
+				statement.subText = line;
+				statement.subTextBreakPoints = new int[0];
+				statement.subTextBreakTimes = new long[0];
+			} else {
+				int index = matcher.start();
+				StringBuilder subTextBuilder = new StringBuilder(line.substring(0, index));
+				ArrayList<Integer> breakPoints = new ArrayList<>();
+				ArrayList<Long> breakTimes = new ArrayList<>();
+				String text;
+				do {
+					breakPoints.add(index);
+					breakTimes.add(Long.parseLong(matcher.group(1)) * 60 * 1000
+							+ Long.parseLong(matcher.group(2)) * 1000 + Long.parseLong(matcher.group(3)));
+					text = matcher.group(4);
+					subTextBuilder.append(text);
+					index += text.length();
+				} while (matcher.find());
+				statement.subText = subTextBuilder.toString();
+				statement.subTextBreakPoints = list2intArray(breakPoints);
+				statement.subTextBreakTimes = list2LongArray(breakTimes);
 			}
+		}
+		if (scanner.hasNext()) {
+			return false;
+		}
+		// 替换
+		statements.set(position, statement);
+		return true;
+	}
+
+	private void printStatement(PrintStream printStream, Statement statement) {
+		long time = statement.time;
+		printStream.printf("[%d:%d.%d]", time / 60 / 1000, time / 1000 % 60, time % 1000);
+		// 考虑到关键点
+		int textBreakPointCount = statement.textBreakPoints.length;
+		int lastIndex = 0;
+		for (int i = 0; i < textBreakPointCount; i++) {
+			time = statement.textBreakTimes[i];
+			printStream.printf("%s[%d:%d.%d]", statement.text.substring(lastIndex, statement.textBreakPoints[i]),
+					time / 60 / 1000, time / 1000 % 60, time % 1000);
+			lastIndex = statement.textBreakPoints[i];
+		}
+		printStream.println(statement.text.substring(lastIndex));
+		if (!statement.subText.isEmpty()) {
+			int subTextBreakPointCount = statement.subTextBreakPoints.length;
+			lastIndex = 0;
+			for (int i = 0; i < subTextBreakPointCount; i++) {
+				time = statement.subTextBreakTimes[i];
+				printStream.printf("%s[%d:%d.%d]",
+						statement.subText.substring(lastIndex, statement.subTextBreakPoints[i]), time / 60 / 1000,
+						time / 1000 % 60, time % 1000);
+				lastIndex = statement.subTextBreakPoints[i];
+			}
+			printStream.println(statement.subText.substring(lastIndex));
 		}
 	}
 
@@ -538,5 +636,11 @@ public final class Lrc {
 		private long[] textBreakTimes;
 		private int[] subTextBreakPoints;
 		private long[] subTextBreakTimes;
+
+		Statement() {
+			text = "";
+			textBreakPoints = new int[0];
+			textBreakTimes = new long[0];
+		}
 	}
 }
