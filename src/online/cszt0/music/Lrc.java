@@ -11,6 +11,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -483,9 +484,14 @@ public final class Lrc {
 
 	public String getStatementText(int index) {
 		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-		PrintStream printStream = new PrintStream(byteArrayOutputStream);
+		PrintStream printStream;
+		try {
+			printStream = new PrintStream(byteArrayOutputStream,false, StandardCharsets.UTF_8.name());
+		} catch (UnsupportedEncodingException e) {
+			throw new RuntimeException(e);
+		}
 		printStatement(printStream, statements.get(index));
-		String s = new String(byteArrayOutputStream.toByteArray());
+		String s = new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8);
 		return s.substring(0, s.length() - 1);
 	}
 

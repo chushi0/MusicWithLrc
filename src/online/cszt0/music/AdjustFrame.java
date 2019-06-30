@@ -61,6 +61,7 @@ public class AdjustFrame extends JFrame {
 		JPanel topPanel = new JPanel(new BorderLayout());
 		statusLabel = new JLabel("已停止");
 		timeLabel = new JLabel();
+		timeLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
 		topPanel.add(statusLabel, BorderLayout.WEST);
 		topPanel.add(timeLabel, BorderLayout.EAST);
 		rightContentPanel.add(topPanel, BorderLayout.NORTH);
@@ -73,6 +74,7 @@ public class AdjustFrame extends JFrame {
 		};
 		mainLabel.setFont(new Font(Font.DIALOG, Font.PLAIN, 32));
 		mainLabel.setUnreachedColor(0);
+		mainLabel.setCursor(new Cursor(Cursor.TEXT_CURSOR));
 		translateLabel = new ProgressTextLabel() {
 			@Override
 			protected int getLeft() {
@@ -81,6 +83,7 @@ public class AdjustFrame extends JFrame {
 		};
 		translateLabel.setFont(new Font(Font.DIALOG, Font.PLAIN, 24));
 		translateLabel.setUnreachedColor(0);
+		translateLabel.setCursor(new Cursor(Cursor.TEXT_CURSOR));
 		GridBagConstraints gridBagConstraints = new GridBagConstraints();
 		gridBagConstraints.anchor = GridBagConstraints.CENTER;
 		gridBagConstraints.gridy = 0;
